@@ -1,0 +1,13 @@
+name: shiny_tablero
+title: shiny_tablero
+username:
+account: conabio
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2269071
+bundleId: 3122683
+url: https://conabio.shinyapps.io/shiny_tablero/
+when: 1588980210.96171
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: TdC_AgroBD.docx
