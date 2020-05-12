@@ -37,6 +37,11 @@ sidebar <- dashboardSidebar(sidebarMenu(
     text = "Mercado",
     tabName = "mercado",
     icon = icon("comments-dollar")
+  ),
+  menuItem(
+    text = "Reporte",
+    tabName = "reporte",
+    icon = icon("bar-chart-o")
   )
 ))
 
