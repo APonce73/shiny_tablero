@@ -39,3 +39,15 @@ library(openxlsx)
 #    #direct2
 #    downloadFile(uno, "dataBase/KoboConabio/Componente2_4.xlsx", username = Passw1, password = Passw2)
 #    
+
+
+ Hoja_1 <-  c("a9MUq5cfdedxVWoSRiX3ct")
+ Hoja_2 <-  c("proyectos_cofinan")
+ Hoja_3 <-  c("participantes_persona")
+ 
+ 
+tabla1 <- read_xlsx("Database/KoboConabio/Componente2_4.xlsx", sheet = Hoja_1)
+tabla2 <- read_xlsx("Database/KoboConabio/Componente2_4.xlsx", sheet = Hoja_2)
+tabla3 <- read_xlsx("Database/KoboConabio/Componente2_4.xlsx", sheet = Hoja_3)
+
+ 
