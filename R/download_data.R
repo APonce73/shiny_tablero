@@ -27,24 +27,24 @@ class(json_content)
 dim(json_content)
     
     
-    json_content1 <- json_content %>%
-        select(url, formid, title) %>%
-        filter(
-            title %in% c("Registro de Proyectos. Componentes 2 y 4 (GEF-Agrobiodiversidad)",
-                         "Materiales de comunicacion"))
-    
-    
-    head(json_content1,10)
-    
-    uno <- paste0(json_content1[1,1], ".xlsx") 
-    #dir("database/KoboConabio")
-    #direct2
-    downloadFile(uno, "dataBase/KoboConabio/Componente2_4.xlsx", username = Passw1, password = Passw2)
+json_content1 <- json_content %>%
+    select(url, formid, title) %>%
+    filter(
+        title %in% c("Registro de Proyectos. Componentes 2 y 4 (GEF-Agrobiodiversidad)",
+                     "Materiales de comunicacion"))
 
-    dos <- paste0(json_content1[2,1], ".xlsx") 
-    #dir("database/KoboConabio")
-    #direct2
-    downloadFile(dos, "dataBase/KoboConabio/Mat_comunicacion.xlsx", username = Passw1, password = Passw2)
+
+head(json_content1,10)
+
+uno <- paste0(json_content1[1,1], ".xlsx") 
+#dir("database/KoboConabio")
+#direct2
+downloadFile(uno, "dataBase/KoboConabio/Componente2_4.xlsx", username = Passw1, password = Passw2)
+
+dos <- paste0(json_content1[2,1], ".xlsx") 
+#dir("database/KoboConabio")
+#direct2
+downloadFile(dos, "dataBase/KoboConabio/Mat_comunicacion.xlsx", username = Passw1, password = Passw2)
     
     
     

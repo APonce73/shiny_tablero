@@ -1,0 +1,1807 @@
+---
+title: "Reporte Kobo"
+author: "Conabio"
+date: "5/19/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(readxl)
+library(rio)
+library(R.utils)
+library(ggrepel)
+library(openxlsx)
+library(lubridate)
+library(mxmaps)
+library(kableExtra)
+#library(plyr)
+#library(janitor)
+
+ Hoja_1 <-  c("a9MUq5cfdedxVWoSRiX3ct")
+ Hoja_2 <-  c("proyectos_cofinan")
+ Hoja_3 <-  c("participantes_persona")
+ 
+ 
+tabla1 <- read_xlsx("database/KoboConabio/Componente2_4.xlsx", sheet = Hoja_1)
+tabla2 <- read_xlsx("database/KoboConabio/Componente2_4.xlsx", sheet = Hoja_2)
+tabla3 <- read_xlsx("database/KoboConabio/Componente2_4.xlsx", sheet = Hoja_3)
+comunidades <- read_xlsx("database/comunidades_proyecto.xlsx", sheet = "GEF_LOC_ACT_May2020")
+
+
+INEGI <-
+    read_xlsx("Database/KoboConabio/catun_localidad/catun_localidad.xlsx",
+              sheet = "Consulta") %>%
+    filter(
+        nom_ent %in% c(
+            "Oaxaca",
+            "Chiapas",
+            "Michoacán de Ocampo",
+            "Chihuahua",
+            "Yucatán",
+            "Ciudad de México"
+        )
+    ) 
+
+INEGI1 <- INEGI %>% 
+    dplyr::rename(region = mapa) %>% 
+    select(region:ámbito, lat_decimal, lon_decimal)
+
+rm(INEGI)
+    
+hoy1 <- as.character(today())
+
+data("df_mxmunicipio")
+df_mxmunicipio1 <- df_mxmunicipio %>% 
+    select(state_code, municipio_code, region, state_name, municipio_name, long, lat)
+
+
+tabla1a <- tabla1 %>% 
+    select(`ubicacion/nom_ent`:`proyectos/has`) %>% 
+    select(-`ubicacion/nom_mun_otro`) %>%
+    select(-`ubicacion/nom_loc_otra` ) %>%
+    rename(state_code = `ubicacion/nom_ent`) %>% 
+    rename(region = `ubicacion/nom_mun`) %>% 
+    rename(proyectos = `proyectos/nom_proy`) %>% 
+    rename(localidad_code = `ubicacion/nom_loc`) %>% 
+    rename(area1 = `proyectos/has`) %>% 
+    left_join(df_mxmunicipio1, by = c("region"))
+    
+tabla1b <- tabla1a %>% 
+    mutate(valor = 1) %>% 
+    group_by(state_name) %>% 
+    summarise(value = sum(valor)) %>% 
+    na.omit(value) 
+
+```
+
+_______  
+
+# Indicadores de los datos de Kobo  
+##  Introducción
+
+El proyecto se llega acabo en distintos estados de la república. Hasta el día de **`r hoy1`** se tiene un total de **`r nrow(tabla1)`** proyectos en los siguientes estados: **`r levels(as.factor(tabla1a$state_name))`**,que están distribuidos de la siguiente forma en cada estado:
+
+```{r , echo=FALSE}
+#print(head(tabla1a) )
+knitr::kable(tabla1b, format = "markdown", booktabs = TRUE) 
+
+# Esto es para hacerlo en pdf y con el paquete kableExtra se puede editar las tablas
+#knitr::kable(tabla1b, format = "latex", booktabs = TRUE) %>% 
+#    kable_styling(position = "center")
+
+```
+
+```{r, echo=FALSE}
+tablaLL <- tabla1 %>% 
+    mutate(nombre_tproy = `proyectos/tip_proy`) %>% 
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "01" = 'Intercambio de conocimientos')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "02" = 'Mejoramiento de semillas o milpas')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "03" = 'Conservación de semillas')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "04" = 'Sistemas participativos de garantía')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "05" = 'Sistemas de acopio, transporte y distribución')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "06" = 'Fortalecimiento de capacidades de negocios')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "07" = 'Estrategias de mercado')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "08" = 'Campañas de educación, mercadeo y comunicación')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "09" = 'Establecimiento de locales y puntos de venta de cadenas cortas')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "10" = 'Firma de contratos con tiendas de autoservicios')) %>%
+    mutate(nombre_tproy = recode(nombre_tproy, 
+                                 "11" = 'Sitios web y redes sociales')) %>% 
+    mutate(nombre_subproy = `proyectos/st_proy`) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0101" = 'Feria de Agrobiodiversidad')) %>% 
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0102" = 'Feria gastronómica')) %>% 
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0103" = 'Reunión gastronómica')) %>% 
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0104" = 'Talleres para la formación de capacidades')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0105" = 'Visita a parcelas con agricultores')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0106" = 'Visita a parcelas demostrativas')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0107" = 'Ensayos comparativos en lab. y campo')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0108" = 'Espectáculos intirenantes')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0109" = 'Concurso de arte relacionado con la agrobiodiversidad')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0110" = 'Formación de gpos. en redes sociales')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0111" = 'Establecimiento de centros de información locales')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0201" = 'Diversificación de la milpa')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0202" = 'Conservación de suelos')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0203" = 'Control de plagas y enfermedades')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0204" = 'Sistemas Agroforestales')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0301" = 'Bancos de Semillas')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0302" = 'Redes de intercambio')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0303" = 'Red de custodios')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0401" = 'No aplica')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0501" = 'Acopio')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0502" = 'Transporte')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0503" = 'Distribución')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0601" = 'Administración y contabilidad')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0602" = 'Mercadeo')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0603" = 'Gestión de apoyos públicos')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0701" = 'Locales')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0702" = 'Regionales')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0703" = 'De nicho')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0704" = 'Urbanos')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0705" = 'Exportación')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0801" = 'Educación local')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0802" = 'Educación regional')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0803" = 'Mercadeo local')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0804" = 'Mercadeo regional')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0805" = 'Mercadeo de nicho')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0806" = 'Mercadeo urbano')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0807" = 'Mercadeo de exportación')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0808" = 'Comunicación local')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0809" = 'Comunicación regional')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0901" = 'Locales')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "0902" = 'Puntos de venta')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "1001" = 'Tiendas de autoservicio privadas')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "1002" = 'Tiendas de autoservicio públicas')) %>%
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "1101" = 'Desarrollo y Gestion de sitios web')) %>% 
+    mutate(nombre_subproy = recode(nombre_subproy, 
+                                 "1102" = 'Gestión de redes sociales')) %>% 
+    select(`ubicacion/nom_ent`:`proyectos/has`, `nombre_tproy`, `nombre_subproy`,
+           `proyectos/num_matcom`, "_index") %>% 
+    mutate(valor = 1) %>% 
+    rename(region = `ubicacion/nom_loc`) %>% 
+    rename("parent_index" = "_index")
+
+
+#    filter(`proyectos/tip_proy` == "03")
+
+   #01	Intercambio de conocimientos
+   #02	Mejoramiento de semillas o milpas
+   #03	Conservación de semillas
+   #04	Sistemas participativos de garantía
+   #05	Sistemas de acopio, transporte y distribución
+   #06	Fortalecimiento de capacidades de negocios
+   #07	Estrategias de mercado
+   #08	Campañas de educación, mercadeo y comunicación
+   #09	Establecimiento de locales y puntos de venta de cadenas cortas
+   #10	Firma de contratos con tiendas de autoservicios
+   #11	Sitios web y redes sociales
+
+
+#    filter(`proyectos/st_proy` == "03")
+
+
+   
+
+```
+
+```{r, echo=FALSE}
+#Función para hacer la tabla de linea base
+funcion1 <- function(LB, MI, MF, sumaValor){
+niveles <- c("línea base", "Meta Intermedia", "Meta Final")
+valores <- c(LB, MI, MF)
+tablaH <- data.frame(niveles,valores) %>% 
+    mutate(avances = round(100 * (sumaValor / valores), 1) )
+}
+
+```
+
+
+_______  
+## Num TDC. A.1.0.0.0.0.2  
+### Número de hectáreas de especies globalmente importantes (variedades tradicionales)  
+
+
+**Fuente de información:**  
+Encuestas a las Unidades de Producción Familar  
+
+**Medio:**  
+-Kobo  
+
+**Descripción TDC:**  
+-Superficie cubierta directamente por el proyecto
+
+```{r , echo=FALSE}
+SUMA <- NA
+knitr::kable(funcion1(0,350000,700000, SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. D.1.1.1.3.0.1  
+### Número de bases de datos existentes convertidas/transformadas de acuerdo con el SIAgroBD
+
+**Fuente de Información:**  
+-Registro en SIAGRO_Bases  
+
+**Medio:**  
+- Hojas de cálculo  
+
+**Descripción TDC:**  
+- Fase de transformación de las bases de datos  
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA
+knitr::kable(funcion1(0,12,12, SUMA), format = "markdown", booktabs = TRUE)  
+```
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. D.1.1.1.1.0.1  
+### Número de análisis y síntesis para guiar la toma de decisiones (basados en el SIAgroBD y en los resultados de los proyectos de investigación)
+
+
+**Fuente de Información:**  
+-C1_Publicaciones  
+
+**Medio:**  
+- Hojas de cálculo  
+
+**Descripción TDC:**  
+- Número de reportes de análisis y síntesis para la toma de decisiones  
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA
+knitr::kable(funcion1(0,1,3, SUMA), format = "markdown", booktabs = TRUE)  
+```
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. E.0.1.1.0.0.1  
+### Nivel de conciencia de los valores económicos y culturales de la agrobiodiversidad entre las partes interesadas clave (Ìndice de concientización del valor de la agrobiodiversidad)
+
+**Fuente de Información:**  
+-Encuesta  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Índice de conciencia del valor de la agrobiodiversidad de los productores  
+
+**NOTA: Hasta el momento sin linea base, ni metas**  
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. D.1.1.1.5.0.1  
+### Número de Proyectos de investigación participativa  
+
+
+
+**Fuente de Información:**  
+- C1_Investigación_Participativa  
+
+**Medio:**  
+- Hojas de cálculo  
+
+**Descripción TDC:**  
+- Proyectos de investigación (colecta)  
+
+El número de proyectos de investigación es de **11**
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- 11
+knitr::kable(funcion1(0,10,10, SUMA), format = "markdown", booktabs = TRUE)  
+
+```
+**NOTA: Se usó sólamente el valor de los proyectos de colectas**  
+
+**PENDIENTE**  
+_______  
+
+## Num TDC. D.1.1.1.5.0.2  
+### Número de áreas de implementación con proyectos en marcha  
+
+```{r, echo=FALSE}
+
+comunidades1 <- comunidades %>% 
+    select(ESTADO, GE_elaborados) %>% 
+    filter(GE_elaborados == 1) %>% 
+    mutate(value = 1) %>% 
+    group_by(ESTADO) %>% 
+    summarise(val = sum(value)) %>% 
+    mutate(val = 1)
+```
+
+
+**Fuente de Información:**  
+- Grupos de Enfoque  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de áreas de intervención en donde se realizaron grupos de enfoque  
+
+Al día de hoy **(`r hoy1` )** el número de especies globalmentes significativas que se mantienen en las localidades de intervención directa del proyecto son: **`r sum(comunidades1$val) `**
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(comunidades1$val)
+knitr::kable(funcion1(2,4,6, SUMA), format = "markdown", booktabs = TRUE)  
+
+```
+________  
+
+## Num TDC. D.1.1.1.5.0.3  
+### Número de publicaciones  
+
+**Fuente de Información:**  
+- C1_Publicaciones  
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- Número de publicaciones  
+
+**PENDIENTE**  
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- 0
+knitr::kable(funcion1(0,1,3, SUMA), format = "markdown", booktabs = TRUE)  
+
+```
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. D.1.1.1.4.0.1  
+### Protocolo diseñado, aprobado y adoptado  
+
+**Fuente de Información:**  
+- SIAGRO_protocolo  
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- fase de desarrollo del protocolo  
+
+El protocolo se puede encontrar en alguna de las siguientes fases:  
+0 - Protocolo no existe  
+1 - Protocolo en diseño  
+2 - Protocolo diseñado  
+3 - Protocolo aprobado  
+4 - Protocolo adoptado  
+
+Al día de hoy **(`r hoy1` )**, los avances se pueden ver en la siguiente tabla:  
+
+```{r, echo=FALSE}
+valor <- c("Línea base", "Meta intermedia", "Meta final")
+fase <- c("Protocolo no existe", "Sistema diseño/diseñado", "Sistema implementado/adoptado")
+avance <- c("-", "-", "-")
+tablaD <- data.frame(valor, fase, avance)
+
+knitr::kable(tablaD, format = "markdown", booktabs = TRUE) 
+
+```
+
+**PENDIENTE: CHECAR HOJA DE CÁLCULO**  
+
+_______  
+
+## Num TDC. D.1.1.1.2.0.1  
+### Fase de desarrollo del SIAgroBD  
+
+**Fuente de Información:**  
+- SIAGRO_Registro  
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- fase de desarrollo del SIAgroBD  
+
+El SIAgroBD se puede encontrar en alguna de las siguientes fases:  
+0 - SIAgroBD no existe  
+1 - SIAgroBD en diseño  
+2 - SIAgroBD diseñado  
+3 - SIAgroBD aprobado  
+4 - SIAgroBD adoptado  
+
+Al día de hoy **(`r hoy1` )**, los avances se pueden ver en la siguiente tabla:  
+
+```{r, echo=FALSE}
+valor <- c("Línea base", "Meta intermedia", "Meta final")
+fase <- c("Sistema no existe", "Sistema diseño/diseñado", "Sistema implementado/adoptado")
+avance <- c("-", "-", "-")
+tablaH <- data.frame(valor, fase, avance)
+
+knitr::kable(tablaH, format = "markdown", booktabs = TRUE) 
+
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. D.1.1.0.0.0.1  
+### Número de actores institucionales clave que han adoptado y están usando el SIAgroBD  
+
+**Fuente de Información:**  
+- SIAGRO_Registro  
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- Porcentaje de involucrados institucionales claves que adopten y utilizan el SiAgroBD  
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA
+knitr::kable(funcion1(0,3,75, SUMA), format = "markdown", booktabs = TRUE)  
+
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. E.0.1.1.1.0.3  
+### Protocolo para la valoración rural participativa (incluidas las áreas suburbanas) de os servicios de la agroBD para la seguridad alimentaria de los pequeños productores y sus familias  
+
+**Fuente de Información:**  
+- C1_Protocolo_Valoración_Participativa  
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- Número de protocolos para la valoración participativa de la agrobiodiversidad  
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA
+knitr::kable(funcion1(0,1,1, SUMA), format = "markdown", booktabs = TRUE)  
+
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. E.0.1.1.5.0.1  
+### Protocolo para la valoración económica de los valores nutricionales, de salud y otros valores funcionales de los productos de la agrobiodiversidad  
+
+
+**Fuente de Información:**  
+- C1_Protocolo_Valoración_económica  
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- Número de protocolos para la valoración económica  
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA
+knitr::kable(funcion1(0,1,1, SUMA), format = "markdown", booktabs = TRUE)  
+
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. E.0.1.1.1.0.2  
+### Número de materiales para la comunicación y difusión  del valor de la agrobiodiversidad  
+
+**Fuente de Información:**  
+- Materiales de comunicacón/Registro de Registro de proyectos. Componentes 2 y 4  
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- Número de materiales de comunicación y diseminación de los valores de la agrobiodiversidad  
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA
+knitr::kable(funcion1(0,12,30, SUMA), format = "markdown", booktabs = TRUE)  
+
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. E.0.1.1.1.0.1  
+### Estrategia de comunicación para construir conciencia de los valores de la agrobiodiversidad entre productores, políticos tomadores de decisiones, y consumidores (diseñada y puesta a disposición para su uso bajo los componentes del pryecto 2, 3 y 4)  
+
+¿Cuál es el avance en la implementación de la estrategia de comunicación de los productores, consumidores y tomadores de decisiones?
+
+
+**Fuente de Información:**  
+- C1_Estrategia_Comunicación
+
+**Medio:**  
+- Hoja de cálculo  
+
+**Descripción TDC:**  
+- Fases de la Estrategia  
+
+El SIAgroBD se puede encontrar en alguna de las siguientes fases:  
+0 - Estrategia no  existe  
+1 - Estrategia en diseño  
+2 - Estrategia diseñada  
+3 - Estretegia en implementación
+
+Al día de hoy **(`r hoy1` )**, los avances se pueden ver en la siguiente tabla:  
+
+```{r, echo=FALSE}
+valor <- c("Línea base", "Meta intermedia", "Meta final")
+fase <- c(NA, "Estrategia diseñada", "Estrategia implementada")
+avance <- c("-", "-", "-")
+tablaH <- data.frame(valor, fase, avance)
+
+knitr::kable(tablaH, format = "markdown", booktabs = TRUE) 
+
+```
+
+**PENDIENTE**  
+_______  
+
+## Num TDC. A.1.0.1.0.0.1  
+### Área en hectáreas donde el conocimiento, las prácticas y/o la gestión derivados de los proyectos de fortalecimiento de capacidades para la conservación de la agrobiodiversidad es aplicado.    
+
+**Fuente de Información:**  
+- Componentes 2 y 4
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Áreas (ha) en donde el conocimiento, las prácticas o la gestión es aplicada  
+
+Al día de hoy **(`r hoy1` )** el número de especies globalmentes significativas que se mantienen en las localidades de intervención directa del proyecto son: **`r sum(tabla1a$area1, na.rm = T)` hecáreas**
+
+
+Los avances se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tabla1a$area1, na.rm = T)
+knitr::kable(funcion1(604,1090,2180, SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. A.1.0.0.3.0.1  
+### Número de productores que han recibido diferentes beneficios por conservar y usar de manera sostnible agroBD (incentivos de mercado, subsidios para conservar y prácticas tradicionales relacionadas)  
+
+```{r, echo=FALSE}
+
+tabla2a <- tabla2 %>% 
+    select(`proyectos/cofinan/org`:`proyectos/cofinan/tipo_org`, `_parent_index`) %>% 
+    rename("parent_index" = "_parent_index") %>% 
+    filter(`proyectos/cofinan/tipo_org` %in% c("05", "06", "07"))
+
+tabla1c <- tabla1 %>%  
+    rename("parent_index" = "_index") %>% 
+    right_join(tabla2a, by = "parent_index") 
+   
+tabla3a <- tabla3 %>% 
+    rename("parent_index" = "_parent_index") %>% 
+    right_join(tabla1c, by = "parent_index") %>% 
+    mutate(value1 = 1) %>% 
+    unique()
+```
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de productores que recibieron apoyos gubernamentales para la conservación y y uso sustentable de la agrobiodiversidad  
+
+El total de productores que recibieron apoyos gubernamentales para la conservación y y uso sustentable de la agrobiodiversidad fue de: **`r sum(tabla3a$value1)`**  
+
+Los avances se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tabla3a$value1)
+knitr::kable(funcion1(2268,2900,4100, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. A.1.0.0.0.0.1
+### Numero de especies significativas a nivel mundial (cultivadas y silvestres) que se mantienen en los agroecosistemas descritos en la sáreas de implementación específicas
+
+**Fuente de Información:**  
+- Encuestas (*nota: el dato viene de grupos de enfoque*)
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Especies globalmente significativas  
+
+
+Al día de hoy **(`r hoy1` )** el número de especies globalmentes significativas que se mantienen en las localidades de intervención directa del proyecto son: **`257 `**
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+#print(head(tabla1a) )
+SUMA <- 257
+knitr::kable(funcion1(168,168,168, SUMA), format = "markdown", booktabs = TRUE) 
+```
+**NOTA:** Este indicador se recolectaría con las Encuestas a las Unidades de Producción Familar  
+
+_______  
+
+
+## Num TDC. A.1.0.0.1.0.1  
+### Número de eventos anuales de **Intercambio de conocimientos** de la agrobiodiversidad  
+
+```{r, echo = FALSE}
+# Con el tipo de proyecto 1
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/tip_proy` == "01") %>% 
+    left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+
+#tablaCS1 <- tablaCS %>% 
+#    group_by(nom_loc) %>% 
+#    summarise(res1 = sum(value)) %>% 
+#    replace_na(., list(nom_loc = "Guachochi"))
+
+```
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número anual de eventos para el **`r tablaCS$nombre_tproy[1]`**   
+
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$valor)`** proyectos de **`r tablaCS$nombre_tproy[1]`**  
+
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$valor)
+knitr::kable(funcion1(25,50,75, SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. A.1.0.0.1.0.2  
+### Número de materiales anuales para la difusión del conocimieneto sobre agrobiodiversidad (catálogos, libros, posters, murales, programas de radio, etc.)  
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número anual de materiales para la diseminación del conocimiento   
+
+```{r, echo = FALSE}
+# Con el tipo de proyecto 1
+tablaMC <- tablaLL %>% 
+    ungroup() %>% 
+    filter(`proyectos/tip_proy` == "01") %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    #replace_na(., list(nom_loc = "Guachochi")) %>% 
+    replace_na(., list(`proyectos/num_matcom` = 0)) %>% 
+    group_by(nombre_subproy) %>% 
+    summarise(res1 = sum(`proyectos/num_matcom`))
+```
+
+El total del material de comunicación es de: **`r sum(tablaMC$res1) `**
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+#print(head(tabla1a) )
+SUMA <- sum(tablaMC$res1)
+knitr::kable(funcion1(22,44,66,SUMA),
+             format = "markdown", booktabs = TRUE) 
+```
+**NOTA: Falta el material de comunicación. Hasta el momento solo es material de lo que se subió en el kobo de las regionales**  
+
+_______  
+
+## Num TDC. A.1.0.0.2.0.1  
+### Número total de proyectos para la conservación de semillas, desglozado en: Bancos de semillas, Red de Intercambio y Red de custodios 
+
+```{r, echo = FALSE}
+# Con el tipo de proyecto 3
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/tip_proy` == "03") %>% 
+    group_by(nombre_subproy) %>% 
+    summarise(valor = sum(valor))
+    
+```
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número total de proyectos para la conservación de semillas   
+
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$valor)`** proyectos en la conservación de semillas. Estos proyectos están distribuidos en los siguientes subproyectos:
+
+```{r , echo=FALSE}
+knitr::kable(tablaCS, format = "markdown", booktabs = TRUE) 
+
+
+```
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+#print(head(tabla1a) )
+SUMA <- sum(tablaCS$valor)
+knitr::kable(funcion1(7,14,21, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+## Num TDC. A.1.0.0.2.0.2  
+### Número total de localidades en donde se implementaron proyectos para la conservación de semillas  
+
+```{r, echo=FALSE}
+tablaCS1 <- tablaLL %>%
+    select(region, `ubicacion/nom_loc_otra`, `proyectos/tip_proy`) %>% 
+    left_join(INEGI1, by = "region") %>% 
+    select(nom_loc, `ubicacion/nom_loc_otra`, `proyectos/tip_proy`) %>% 
+    filter(`proyectos/tip_proy` == "03") %>% 
+    mutate(valor = 1) 
+
+tablaCS1_otros <- tablaCS1 %>% 
+    select(`ubicacion/nom_loc_otra`, valor) %>% 
+    rename(nom_loc = `ubicacion/nom_loc_otra`) 
+    
+
+tablaCS1 <- tablaCS1 %>% 
+    select(nom_loc, valor) %>% 
+    bind_rows(tablaCS1_otros) %>% 
+    na.omit(nom_loc) %>% 
+    distinct()
+
+```
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número total de localidades en donde se implementaron proyectos para la conservación de semillas es: `r nrow(tablaCS1)`  
+
+Se implementaron en las siguientes localidades
+
+```{r , echo=FALSE}
+#print(head(tabla1a) )
+knitr::kable(tablaCS1, format = "markdown", booktabs = TRUE) 
+
+```
+Los avances (%)  se pueden ver en la siguiente tabla:  
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$valor)
+knitr::kable(funcion1(31,43,54, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+## Num TDC. A.1.0.0.2.0.3  
+### Número de agricultores participantes en los proyectos de conservación de semillas  
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número total de agricultores en los proyectos para la conservación de semillas  
+
+```{r, echo=FALSE}
+
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/tip_proy` == "03") %>% 
+    select(nombre_subproy, parent_index) 
+
+tabla3a <- tabla3 %>% 
+    rename("parent_index" = "_parent_index") %>% 
+    right_join(tablaCS, by = "parent_index") %>% 
+    mutate(value1 = 1)
+```
+
+El total de agricultores que participaron es de: **`r sum(tabla3a$value1) `**
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tabla3a$value1)
+knitr::kable(funcion1(133,266,400, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+## Num TDC. A.1.0.0.2.0.4  
+### Porcentaje de mujeres participantes en los proyectos de conservación de semillas  
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Porcentaje de mujeres participando en los proyectos para la conservación de semillas  
+
+```{r, echo=FALSE}
+tabla3b <- tabla3a %>% 
+    group_by(`participantes/persona/sexo`) %>% 
+    summarise(val = sum(value1))
+
+prop1 <- round(100 * (tabla3b$val[2]/sum(tabla3b$val)),1) %>% 
+    replace_na(., 0)
+
+```
+La proporción de mujeres fue de: **`r prop1`** %  
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- prop1
+knitr::kable(funcion1(43,50,50, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+## Num TDC. A.1.0.0.2.0.5  
+### Porcentaje de jóvenes participando en los proyectos para la conservación de semillas  
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Porcentaje de jóvenes participando en los proyectos para la conservación de semillas  
+
+```{r, echo=FALSE}
+tabla3c <- tabla3a %>% 
+    filter(`participantes/persona/edad` < 36)
+
+prop2 <- round(100 * (nrow(tabla3c) / nrow(tabla3a)), 1) %>% 
+    replace_na(., 0)
+
+```
+La proporción de jóvenes que partiparon en estos proyectos es de: **`r prop2`** %
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- prop2
+knitr::kable(funcion1(14,30,30, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. A.1.0.0.3.0.2  
+### Número total de proyectos para el **Mejoramiento de semillas o mipas** que se implementaron en las localidades de intervención durante la vida del proyecto
+
+```{r, echo = FALSE}
+# Con el tipo de proyecto 3
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/tip_proy` == "02") %>% 
+    group_by(nombre_subproy) %>% 
+    summarise(valor = sum(valor))
+    
+```
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número total de proyectos para el **Mejoramiento de semillas o milpas** que se implementaron en las localidades de intervención durante la vida del proyecto  
+
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$valor)`** proyectos en la conservación de semillas. Estos proyectos están distribuidos en los siguientes subproyectos:
+
+```{r , echo=FALSE}
+knitr::kable(tablaCS, format = "markdown", booktabs = TRUE) 
+
+
+```
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$valor)
+knitr::kable(funcion1(98,200,300, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+## Num TDC. A.1.0.0.3.0.3  
+### Número total de localidades en donde se implementaron proyectos para el **Mejoramiento de semillas o mipas** 
+
+```{r, echo=FALSE}
+tablaCS1 <- tablaLL %>%
+    select(region, `ubicacion/nom_loc_otra`, `proyectos/tip_proy`) %>% 
+    left_join(INEGI1, by = "region") %>% 
+    select(nom_loc, `ubicacion/nom_loc_otra`, `proyectos/tip_proy`) %>% 
+    filter(`proyectos/tip_proy` == "02") %>% 
+    mutate(valor = 1) 
+
+tablaCS1_otros <- tablaCS1 %>% 
+    select(`ubicacion/nom_loc_otra`, valor) %>% 
+    rename(nom_loc = `ubicacion/nom_loc_otra`) 
+    
+
+tablaCS1 <- tablaCS1 %>% 
+    select(nom_loc, valor) %>% 
+    bind_rows(tablaCS1_otros) %>% 
+    na.omit(nom_loc) %>% 
+    distinct()
+
+```
+
+Se implementaron en las siguientes localidades
+
+```{r , echo=FALSE}
+#print(head(tabla1a) )
+knitr::kable(tablaCS1, format = "markdown", booktabs = TRUE) 
+
+```
+Los avances (%)  se pueden ver en la siguiente tabla:  
+```{r , echo=FALSE}
+SUMA <- nrow(tablaCS1) 
+knitr::kable(funcion1(63,120,180, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+## Num TDC. A.1.0.0.3.0.4  
+### Número total de agricultores en los proyectos para el **Mejoramiento de semillos o milpas** 
+
+```{r, echo=FALSE}
+
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/tip_proy` == "02") %>% 
+    select(nombre_subproy, parent_index) 
+
+tabla3a <- tabla3 %>% 
+    rename("parent_index" = "_parent_index") %>% 
+    right_join(tablaCS, by = "parent_index") %>% 
+    mutate(value1 = 1)
+```
+
+El total de agricultores que participaron es de: **`r sum(tabla3a$value1) `**
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tabla3a$value1) 
+knitr::kable(funcion1(2260,4500,6750, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+## Num TDC. A.1.0.0.3.0.5  
+### Porcentaje de mujeres participantes en los proyectos para el **Mejoramiento de semillas o milpas** 
+
+```{r, echo=FALSE}
+tabla3b <- tabla3a %>% 
+    group_by(`participantes/persona/sexo`) %>% 
+    summarise(val = sum(value1))
+
+prop1 <- round(100 * (tabla3b$val[2]/sum(tabla3b$val)),1) %>% 
+    replace_na(., 0)
+
+```
+
+La proporción de mujeres fue de: **`r prop1`** %
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- prop1 
+knitr::kable(funcion1(39,50,50, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+## Num TDC. A.1.0.0.3.0.6  
+### Porcentaje de jóvenes participantes en los proyectos para el **Mejoramiento de semillas o milpas** 
+
+```{r, echo=FALSE}
+tabla3c <- tabla3a %>% 
+    filter(`participantes/persona/edad` < 36)
+
+prop2 <- round(100 * (nrow(tabla3c) / nrow(tabla3a)), 1) %>% 
+    replace_na(., 0)
+
+```
+Finalmente la proporción de jóvenes que partiparon es de: **`r prop2`** %
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- prop2 
+knitr::kable(funcion1(22,30,30, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+
+## Num TDC. C.0.0.0.1.0.2  
+### Plan Nacional de Desarrollo 2019-2024 incorpora la agrobiodiversidad en uno o más objetivos, estrategias o líneas de acción  
+
+**Fuente de Información:**  
+- Instrumentos de políticas (Componente 3)  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Plan Nacional de Desarrollo 2019-2024 incorpora la agrobiodiversidad
+
+
+El Plan Nacional de Desarrollo 2019-2024 (PND) se puede encontrar en alguna de las siguientes fases:  
+0 - PND no incorpora a la agrbiodiversidad  
+1 - PND incorpora la agrobiodiversidad  
+
+Al día de hoy **(`r hoy1` )**, los avances se pueden ver en la siguiente tabla:  
+
+```{r, echo=FALSE}
+valor <- c("Línea base", "Meta intermedia", "Meta final")
+fase <- c("0 PND", "1 PND", "1 PND")
+avance <- c("-", "-", "-")
+tablaD <- data.frame(valor, fase, avance)
+
+knitr::kable(tablaD, format = "markdown", booktabs = TRUE) 
+
+```
+
+**PENDIENTE**  
+
+
+_______  
+
+## Num TDC. C.0.0.0.1.0.3  
+### Número de programas sectoriales, que incorporen a la agrobiodiversidad en una o más objetivos, estrategias o línes de acción    
+
+**Fuente de Información:**  
+- Instrumentos de políticas (Componente 3)  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de programas sectoriales, especiales y regionales que incorporan la agrobiodiversidad  
+
+Los avances (%) de los programas sectoriales se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- 0 
+knitr::kable(funcion1(0,4,4, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. C.0.0.0.1.0.4  
+### Número de programas presupuestarios cuyas reglas de operación incorporan normas, reglas y criterios o incentivos dirigidos hacia la conservación y uso sustentable de la agrobiodiversidad  
+
+**Fuente de Información:**  
+- Instrumentos de políticas (Componente 3)  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de programas presupuestarios que incorporan normas o criterios para la conservación y el uso sustentable de la agrobiodiversidad  
+
+Los avances (%) de los programas presupuestarios se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- 0 
+knitr::kable(funcion1(2, 6, 9, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. C.0.1.1.0.0.1  
+### Índice de concientización de los funcionarios públicos medido por el índice de conciencizción de la AgroBD desarrollado en el producto 1.1.3  
+
+**Fuente de Información:**  
+- FALTA  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Índice de conciencia del valor de la agrobiodiversidad de los tomadores de decisiones  
+
+Los avances en el índice (puntos) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA 
+knitr::kable(funcion1(NA, 50, 85, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. C.0.0.0.1.2.1  
+### Número de políticas priorizadas (considerando el PND, los programas sectoriales y los programas presupuestales)  
+
+**Fuente de Información:**  
+- Instrumento de políticas públicas (Componente 3)  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de políticas priorizadas  
+
+Los avances en el número de políticas públicas priorizadas se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA 
+knitr::kable(funcion1(0, 15, 15, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. C.0.0.0.1.1.1  
+### Número de políticas negociadas  
+
+**Fuente de Información:**  
+- Intrumentos de políticas  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de políticas priorizadas  
+
+Los avances en el número de políticas públicas negociadas se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA 
+knitr::kable(funcion1(0, 6, 12, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. C.0.0.0.1.0.1  
+### Número de políticas modificadas  
+
+**Fuente de Información:**  
+- Intrumentos de políticas  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de políticas modificadas  
+
+Los avances en el número de políticas públicas modificadas se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- NA 
+knitr::kable(funcion1(0, 6, 12, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+
+## Num TDC.   
+### Estrategias para la promoción de los productos de la agrobiodiversidad y campañas de marketing diseñadas e implementadas 
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. B.0.1.1.0.0.2  
+### Índice de accesibilidad de los productos de la agrobiodiversidad a los mercados locales y regionales (medido a través de los cuatro indicadores del producto 4.1.2)
+
+**Fuente de Información:**  
+- - Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Índice de accesibilidad de los productos de la agrobiodiversidad a los mercados locales y regionales  
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("0102","0101","0902")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+
+
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** lugares en donde se comercializan los productos derivados de la agrobiodiversidad generados por las UPF ubicadas en las localidades de intervención del proyecto.  
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(2,19,52, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**NOTA: No se incluyo los negocios pivote porqué no hay hasta ahora en la encuesta **
+_______  
+
+## Num TDC. B.0.1.2.6.0.1  
+### Número de estudios de mercado  
+
+**Fuente de Información:**  
+- - Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de estudios de mercado  
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. B.0.1.2.5.0.1  
+### Número de campañas de campañas de valoración y mercadeo dela agrobiodiversidad  
+
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/tip_proy` %in% c("08")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** campañas de marketing y de valoración de la agrobiodiversidad    
+
+Los avances (%) se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(0,3,6, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+## Num TDC. B.0.1.2.5.0.2  
+### Número de materiales de comunicación social y promoción sobre los valores de la agrobiodiversidad dirigidos a consumidores para posicionaramarcas, indicaciones geográficas u otros sellos de identidad territorial  
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Materiales de comunicación social y promoción sobre los valores de la agrobiodiversidado  
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. B.0.1.2.5.0.3  
+### Número de evaluaciones de campañas y materiales e la etapa intermedia y final del proyecto  
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número de evaluaciones de las campañas y de los materiales  
+
+```{r , echo=FALSE}
+SUMA <- NA 
+knitr::kable(funcion1(0,1,2, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. B.0.1.1.2.0.1  
+### Número de locales y puestos de comercialización en cadenas o circuitos cortos de comercialización  
+
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("0902")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** sistemas de acopio, transporte y distribución de semillas o productos derivados de la agrobiodiversidad que se establecieron para vincular a las UPF con los mercados locales durante la implementación del proyecto.  
+
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(0,6,12, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+## Num TDC. B.0.1.2.2.0.1  
+### Número de ferias de la agrobiodiversidad  
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("0101")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** eventos catalogados como ferias de agrobiodiversidad    
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(1,3,20, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. B.0.1.2.1.0.1  
+### Número de ferias gastronómicas específicas o encuentros entre cocineras tradicinales  
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("0102", "0103")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** eventos catalogados como ferias o reuniones gastronómicas  
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(0,3,6, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. B.0.1.1.3.0.1  
+### Número de contratos en supermercados locales  
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("1001", "1002")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** contratos con supermercados locales, ya sean tiendas de autoservicio privadas o públicas  
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(1,3,6, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+
+## Num TDC. B.0.1.1.4.0.1  
+### Número de empresas formadas (inglés: negocios pivote)  
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("0901", "0902")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** negocios pivote
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(0,4,8, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. B.0.1.1.6.0.1  
+### Marca colectiva  
+
+**Fuente de Información:**  
+- Registros de proyectos Componentes 2 y 4  
+
+**Medio:**  
+- Kobo  
+
+**Descripción TDC:**  
+- Número marcas colectivas  
+
+```{r , echo=FALSE}
+SUMA <- NA 
+knitr::kable(funcion1(0,1,1, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+**PENDIENTE**  
+
+_______  
+
+## Num TDC. B.0.1.2.4.0.1  
+### Número de sistemas participativos de garantía  
+
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/tip_proy` %in% c("04")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** sistemas participativos de garantía    
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(1,30,60, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+## Num TDC. B.0.1.1.5.0.1  
+### Número de sitios web para impulsar la promoción y comercialización de productos  
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("1101")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** sitios web establecidos o en desarrollo  
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(0,3,6, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. B.0.1.2.3.0.1  
+### App de gastronomía de la AgroBD  
+
+Este indicador es del tipo cualitativo y describe el avance que guarda el desarrollo de la aplicación, conforme ete avance la descripción sera actualizada.  
+
+Los niveles para la evaluación del estado de la aplicación son:
+- Sin avance: 0  
+- En diseño: 1  
+- En fase de prueba: 2  
+- Disponible para descarga: 3  
+- Disponible para descarga (versión mejorada): 4  
+
+Los avances (marcado con una "X") se pueden ver en la siguiente tabla:  
+
+```{r, echo=FALSE}
+valor <- c("Ninguna", "Disponible para descarga", "Mejorada")
+avance <- c("X", "-", "-")
+tablaH <- data.frame(valor, avance)
+
+knitr::kable(tablaH, format = "markdown", booktabs = TRUE) 
+
+```
+
+**PENDIENTE**  
+_______  
+
+# PR1  
+_______  
+
+# PR2  
+_______
+
+# PR3  
+_______  
+
+# PR4  
+_______  
+
+# Global Environment Benefits (p. 60)  
+_______  
+
+# Tracking tools  
+_______  
+
+_______
+_______
+_______
+# FIN
+
+
+## Num TDC. A.1.0.0.0.0.3  
+### Superficie (ha) cubierta indirectamente con el proyecto  
+
+No se ha levantado información  
+
+```{r , echo=FALSE}
+#print(head(tabla1a) )
+SUMA <- NA
+knitr::kable(funcion1(4339799,4339799,4339799, SUMA), format = "markdown", booktabs = TRUE) 
+```
+**NOTA:** Solicitud de información de las dependencias gubernamentales de los padrones de beneficiarios de cada programa tranversalizado  
+
+_______  
+## Num TDC. A.1.0.0.0.0.4  
+### Uniformidad en la distribución superficial de las especies globalmente   significativas
+No se ha levantado información  
+
+*Sin línea base, ni meta intermedia, ni meta final*
+
+**NOTA:** Este indicador se recolectaría con las Encuestas a las Unidades de Producción Familar  
+
+_______  
+## Num TDC. A.1.1.0.0.0.1  
+### Indicador de preservación  
+
+**NOTA:** PENDIENTE  
+
+_______  
+## Num TDC. A.1.1.0.0.0.2  
+### Indicador de intercambio  
+
+**NOTA:** PENDIENTE  
+
+_______  
+## Num TDC. A.1.1.0.0.0.3  
+### Indicador de autoconsumo  
+
+**NOTA:** PENDIENTE  
+
+_______  
+## Num TDC. A.1.1.0.0.0.4  
+### Indicador de beneficios  
+
+**NOTA:** PENDIENTE
+
+_______  
+## Num TDC. A.1.1.0.0.0.5  
+### Indicador de ingresos  
+
+**NOTA:** PENDIENTE  
+
+_______  
+
+## Num TDC. A.1.5.0.0.0.1  
+### Indicador de Ingresos
+
+
+**NOTA:** Método de recolección: PENDIENTE  
+
+_______  
+## Num TDC. A.1.0.2.0.0.2  
+### Indicador de reducción de pérdidas
+
+
+**NOTA:** Método de recolección: PENDIENTE  
+
+_______  
+
+## Num TDC. B.0.1.0.0.0.1  
+### Índice de acceso de los productos de la agrobiodiversidad a los mercados locales
+
+#### Método de recolección:
+- **Registro en el sistema de seguimiento del proyecto**  
+- Descarga del Directorio Estadístico nacional de Unidades Económicas (DNUE)
+
+_______  
+## Num TDC. B.0.1.1.0.0.2  
+### Índice de accesibilidad de los productos de la agrobiodiversidad a los mercados locales y regionales
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("0102","0101","0902")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+
+
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** lugares en donde se comercializan los productos derivados de la agrobiodiversidad generados por las UPF ubicadas en las localidades de intervención del proyecto.  
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(2,19,52, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+## Num TDC. B.0.1.1.1.0.1  
+### Número total de sistemas de acopio, transporte y distribución  
+
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("0501","0502","0503")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** sistemas de acopio, transporte y distribución de semillas o productos derivados de la agrobiodiversidad que se establecieron para vincular a las UPF con los mercados locales durante la implementación del proyecto.  
+
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(NA,NA,NA, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+
+_______  
+
+
+## Num TDC. B.0.1.1.3.0.1  
+### Número de contratos con supermercados locales  
+
+```{r, echo=FALSE}
+tablaCS <- tablaLL %>% 
+    filter(`proyectos/st_proy` %in% c("1001", "1002")) %>% 
+    #left_join(INEGI1, by = "region") %>% 
+    mutate(value = 1) 
+```
+Hasta la fecha **(`r hoy1` )** se tienen **`r sum(tablaCS$value)`** contratos con supermercados locales, ya sean tiendas de autoservicio privadas o públicas  
+
+Los avances (%)  se pueden ver en la siguiente tabla:  
+
+```{r , echo=FALSE}
+SUMA <- sum(tablaCS$value) 
+knitr::kable(funcion1(1,3,6, sumaValor = SUMA), format = "markdown", booktabs = TRUE) 
+```
+_______  
+
+## Num TDC. B.0.1.1.6.0.1  
+### Número marcas colectivas  
+
+#**PENDIENTE**
+
+_______  
+
+
+## Num TDC. B.0.1.2.0.0.1  
+### Índice de conciencia del valor de la agrobiodiversidad de los consumidores  
+
+**Método de Recolección:**
+-Encuesta representativa a nivel municipal
+
+_______  
+
+
+
+## Num TDC. C.1.0.0.0.0.1  
+### Razón de incentivos vs desincentivos  
+
+##**PENDIENTE**  
+
+**Método de recolección:**  
+-Registro en el sistema de seguimiento del proyecto  
+
+
+_______  
+
+## Num TDC. C.1.0.0.0.0.1  
+### Razón de incentivos vs desincentivos  
+
+##**PENDIENTE**  
+
+**Método de recolección:**  
+- Solicitud de información a las dependencias gubernamentales de los padrones de beneficiarions de cada programa transversalizado  
+_______  
+
+
